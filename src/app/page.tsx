@@ -38,6 +38,12 @@ export default function Home() {
       const response = await fetch('/api/files');
       const data = await response.json();
 
+      // Check if the response was successful and has files
+      if (!response.ok || !data.files) {
+        console.error('Failed to fetch files:', data.error || 'Unknown error');
+        return;
+      }
+
       const background = data.files.filter((f: AudioFile) => f.type === 'background');
       const voiceover = data.files.filter((f: AudioFile) => f.type === 'voiceover');
 
