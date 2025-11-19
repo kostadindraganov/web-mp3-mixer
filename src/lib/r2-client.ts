@@ -26,7 +26,8 @@ const getR2Client = () => {
 export const uploadToR2 = async (
   file: Buffer,
   fileName: string,
-  type: 'background' | 'voiceover'
+  type: 'background' | 'voiceover',
+  contentType: string = 'audio/mpeg'
 ): Promise<string> => {
   const r2Client = getR2Client();
   const key = `${type}/${Date.now()}-${fileName}`;
@@ -35,7 +36,7 @@ export const uploadToR2 = async (
     Bucket: process.env.R2_BUCKET_NAME,
     Key: key,
     Body: file,
-    ContentType: 'audio/mpeg',
+    ContentType: contentType,
   });
 
   await r2Client.send(command);

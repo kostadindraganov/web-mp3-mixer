@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // Upload to R2
-    const key = await uploadToR2(buffer, file.name, type);
+    const key = await uploadToR2(buffer, file.name, type, file.type);
 
     return NextResponse.json({
       success: true,
