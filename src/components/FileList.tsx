@@ -51,9 +51,11 @@ export default function FileList({ files, type, onDelete, currentPlayingIndex }:
         files.map((file, index) => (
           <div
             key={file.key}
-            className={`p-3 rounded-lg border transition-colors ${
+            className={`p-3 rounded-lg border transition-all duration-300 ${
               currentPlayingIndex === index
-                ? 'bg-blue-50 border-blue-400'
+                ? type === 'background'
+                  ? 'bg-blue-50 border-blue-400 shadow-md'
+                  : 'bg-purple-50 border-purple-400 shadow-md'
                 : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -61,9 +63,20 @@ export default function FileList({ files, type, onDelete, currentPlayingIndex }:
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   {currentPlayingIndex === index && (
-                    <span className="text-blue-600 text-sm">▶</span>
+                    <div className="flex items-center gap-1">
+                      {/* Animated sound bars */}
+                      <div className="flex items-end gap-0.5 h-4">
+                        <div className={`w-1 ${type === 'background' ? 'bg-blue-600' : 'bg-purple-600'} rounded-sm animate-sound-bar-1`} style={{ animationDelay: '0ms' }}></div>
+                        <div className={`w-1 ${type === 'background' ? 'bg-blue-600' : 'bg-purple-600'} rounded-sm animate-sound-bar-2`} style={{ animationDelay: '150ms' }}></div>
+                        <div className={`w-1 ${type === 'background' ? 'bg-blue-600' : 'bg-purple-600'} rounded-sm animate-sound-bar-3`} style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </div>
                   )}
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className={`text-sm font-medium truncate ${
+                    currentPlayingIndex === index
+                      ? type === 'background' ? 'text-blue-900' : 'text-purple-900'
+                      : 'text-gray-900'
+                  }`}>
                     {file.name}
                   </p>
                 </div>
@@ -82,6 +95,30 @@ export default function FileList({ files, type, onDelete, currentPlayingIndex }:
           </div>
         ))
       )}
+
+      <style jsx>{`
+        @keyframes soundBar1 {
+          0%, 100% { height: 4px; }
+          50% { height: 14px; }
+        }
+        @keyframes soundBar2 {
+          0%, 100% { height: 8px; }
+          50% { height: 16px; }
+        }
+        @keyframes soundBar3 {
+          0%, 100% { height: 6px; }
+          50% { height: 12px; }
+        }
+        .animate-sound-bar-1 {
+          animation: soundBar1 0.6s ease-in-out infinite;
+        }
+        .animate-sound-bar-2 {
+          animation: soundBar2 0.6s ease-in-out infinite;
+        }
+        .animate-sound-bar-3 {
+          animation: soundBar3 0.6s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
