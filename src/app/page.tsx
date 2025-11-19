@@ -19,11 +19,30 @@ export default function Home() {
   const [voiceoverPlayOrder, setVoiceoverPlayOrder] = useState<number[]>([]);
   const [voiceoverDelayInput, setVoiceoverDelayInput] = useState(60); // Input value for delay
   const [voiceoverDelay, setVoiceoverDelay] = useState(60); // Active delay in seconds before starting voiceover
+  const [isRandomVoiceover, setIsRandomVoiceover] = useState(true);
+  const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
+  const [progress, setProgress] = useState<Record<string, { current: number; total: number }>>({});
 
   const audioEngineRef = useRef<AudioMixerEngine | null>(null);
+  const requestRef = useRef<number>();
   const backgroundIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const voiceoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const voiceoverDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  const voiceoverDelayRef = useRef(voiceoverDelay);
+  const isRandomVoiceoverRef = useRef(isRandomVoiceover);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    voiceoverDelayRef.current = voiceoverDelay;
+  }, [voiceoverDelay]);
+
+  useEffect(() => {
+    isRandomVoiceoverRef.current = isRandomVoiceover;
+  }, [isRandomVoiceover]);
 
   // Helper function to clear all timers
   const clearAllTimers = useCallback(() => {
@@ -44,8 +63,29 @@ export default function Home() {
   // Initialize audio engine
   useEffect(() => {
     audioEngineRef.current = new AudioMixerEngine();
+
+    const animate = () => {
+      if (audioEngineRef.current && isPlayingRef.current) {
+        const bgTime = audioEngineRef.current.getBackgroundCurrentTime();
+        const bgDuration = audioEngineRef.current.getBackgroundDuration();
+        const voTime = audioEngineRef.current.getVoiceoverCurrentTime();
+        const voDuration = audioEngineRef.current.getVoiceoverDuration();
+
+        setProgress({
+          background: { current: bgTime, total: bgDuration },
+          voiceover: { current: voTime, total: voDuration },
+        });
+      }
+      requestRef.current = requestAnimationFrame(animate);
+    };
+
+    requestRef.current = requestAnimationFrame(animate);
+
     return () => {
       clearAllTimers();
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
       audioEngineRef.current?.destroy();
     };
   }, [clearAllTimers]);
@@ -90,50 +130,63 @@ export default function Home() {
     return shuffled;
   };
 
-  const playNextBackground = useCallback(() => {
+  const playNextBackground = useCallback((index: number) => {
     if (backgroundFiles.length === 0 || !audioEngineRef.current) return;
 
-    const nextIndex = (currentBackgroundIndex + 1) % backgroundFiles.length;
-    setCurrentBackgroundIndex(nextIndex);
+    setCurrentBackgroundIndex(index);
 
-    audioEngineRef.current.playBackground(backgroundFiles[nextIndex].url, false);
+    // Increment play count
+    const fileKey = backgroundFiles[index].key;
+    setPlayCounts(prev => ({
+      ...prev,
+      [fileKey]: (prev[fileKey] || 0) + 1
+    }));
 
-    // Clear previous interval if exists
-    if (backgroundIntervalRef.current) {
-      clearInterval(backgroundIntervalRef.current);
-    }
-
-    // Set up listener for when background track ends
-    backgroundIntervalRef.current = setInterval(() => {
-      if (audioEngineRef.current && !audioEngineRef.current.isBackgroundPlaying()) {
-        if (backgroundIntervalRef.current) {
-          clearInterval(backgroundIntervalRef.current);
-          backgroundIntervalRef.current = null;
-        }
-        if (isPlaying) {
-          playNextBackground();
-        }
-      }
-    }, 1000);
-  }, [backgroundFiles, currentBackgroundIndex, isPlaying]);
-
-  const playNextVoiceover = useCallback(() => {
-    if (voiceoverFiles.length === 0 || !audioEngineRef.current) return;
-
-    const currentOrderIndex = voiceoverPlayOrder.findIndex(
-      (index) => index === currentVoiceoverIndex
-    );
-    const nextOrderIndex = (currentOrderIndex + 1) % voiceoverPlayOrder.length;
-    const nextFileIndex = voiceoverPlayOrder[nextOrderIndex];
-
-    setCurrentVoiceoverIndex(nextFileIndex);
-
-    audioEngineRef.current.playVoiceover(voiceoverFiles[nextFileIndex].url, () => {
-      if (isPlaying) {
-        voiceoverTimeoutRef.current = setTimeout(() => playNextVoiceover(), 500);
+    audioEngineRef.current.playBackground(backgroundFiles[index].url, false, () => {
+      if (isPlayingRef.current) {
+        const nextIndex = (index + 1) % backgroundFiles.length;
+        playNextBackground(nextIndex);
       }
     });
-  }, [voiceoverFiles, currentVoiceoverIndex, voiceoverPlayOrder, isPlaying]);
+  }, [backgroundFiles]);
+
+  const playNextVoiceover = useCallback((index: number) => {
+    if (voiceoverFiles.length === 0 || !audioEngineRef.current) return;
+
+    setCurrentVoiceoverIndex(index);
+
+    // Increment play count
+    const fileKey = voiceoverFiles[index].key;
+    setPlayCounts(prev => ({
+      ...prev,
+      [fileKey]: (prev[fileKey] || 0) + 1
+    }));
+
+    audioEngineRef.current.playVoiceover(voiceoverFiles[index].url, () => {
+      if (isPlayingRef.current) {
+        let nextFileIndex;
+
+        if (isRandomVoiceoverRef.current) {
+          // True random selection
+          if (voiceoverFiles.length > 1) {
+            let nextIndex;
+            do {
+              nextIndex = Math.floor(Math.random() * voiceoverFiles.length);
+            } while (nextIndex === index);
+            nextFileIndex = nextIndex;
+          } else {
+            nextFileIndex = 0;
+          }
+        } else {
+          // Sequential order
+          nextFileIndex = (index + 1) % voiceoverFiles.length;
+        }
+
+        const delayMs = voiceoverDelayRef.current * 1000;
+        voiceoverTimeoutRef.current = setTimeout(() => playNextVoiceover(nextFileIndex), delayMs);
+      }
+    });
+  }, [voiceoverFiles, voiceoverPlayOrder]);
 
   const handlePlayPause = () => {
     if (!audioEngineRef.current) return;
@@ -150,25 +203,7 @@ export default function Home() {
 
       // Start background if available
       if (backgroundFiles.length > 0) {
-        audioEngineRef.current.playBackground(backgroundFiles[currentBackgroundIndex].url, false);
-
-        // Clear previous interval if exists
-        if (backgroundIntervalRef.current) {
-          clearInterval(backgroundIntervalRef.current);
-        }
-
-        // Set up auto-play for next background track
-        backgroundIntervalRef.current = setInterval(() => {
-          if (audioEngineRef.current && !audioEngineRef.current.isBackgroundPlaying()) {
-            if (backgroundIntervalRef.current) {
-              clearInterval(backgroundIntervalRef.current);
-              backgroundIntervalRef.current = null;
-            }
-            if (isPlaying) {
-              playNextBackground();
-            }
-          }
-        }, 1000);
+        playNextBackground(currentBackgroundIndex);
       }
 
       // Start voiceover after delay if available
@@ -176,17 +211,38 @@ export default function Home() {
         const delayMs = voiceoverDelay * 1000; // Convert seconds to milliseconds
 
         voiceoverDelayTimeoutRef.current = setTimeout(() => {
-          if (!audioEngineRef.current || !isPlaying) return;
+          if (!audioEngineRef.current || !isPlayingRef.current) return;
 
           // Set the index only when voiceover actually starts playing
-          const firstVoiceoverIndex = voiceoverPlayOrder[0];
+          // If random, pick random index. If sequential, start from 0.
+          const firstVoiceoverIndex = isRandomVoiceoverRef.current && voiceoverFiles.length > 0
+            ? Math.floor(Math.random() * voiceoverFiles.length)
+            : 0;
+
           setCurrentVoiceoverIndex(firstVoiceoverIndex);
 
           audioEngineRef.current.playVoiceover(
             voiceoverFiles[firstVoiceoverIndex].url,
             () => {
-              if (isPlaying) {
-                voiceoverTimeoutRef.current = setTimeout(() => playNextVoiceover(), 500);
+              if (isPlayingRef.current) {
+                let nextFileIndex;
+
+                if (isRandomVoiceoverRef.current) {
+                  if (voiceoverFiles.length > 1) {
+                    let nextIndex;
+                    do {
+                      nextIndex = Math.floor(Math.random() * voiceoverFiles.length);
+                    } while (nextIndex === firstVoiceoverIndex);
+                    nextFileIndex = nextIndex;
+                  } else {
+                    nextFileIndex = 0;
+                  }
+                } else {
+                  nextFileIndex = (firstVoiceoverIndex + 1) % voiceoverFiles.length;
+                }
+
+                const nextDelayMs = voiceoverDelayRef.current * 1000;
+                voiceoverTimeoutRef.current = setTimeout(() => playNextVoiceover(nextFileIndex), nextDelayMs);
               }
             }
           );
@@ -253,6 +309,8 @@ export default function Home() {
               type="background"
               onDelete={handleDeleteFile}
               currentPlayingIndex={isPlaying ? currentBackgroundIndex : undefined}
+              playCounts={playCounts}
+              progress={isPlaying ? progress.background : undefined}
             />
             <div className="mt-4">
               <UploadButton type="background" onUploadComplete={fetchFiles} />
@@ -262,13 +320,24 @@ export default function Home() {
           {/* Voice Over Column */}
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-purple-600">Voice Over</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-purple-600">Voice Over</h2>
+                <button
+                  onClick={() => setIsRandomVoiceover(!isRandomVoiceover)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-colors border ${isRandomVoiceover
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'
+                    }`}
+                >
+                  Random: {isRandomVoiceover ? 'ON' : 'OFF'}
+                </button>
+              </div>
               <span className="text-sm text-gray-500">
                 {voiceoverFiles.length} files
               </span>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Plays one by one in random order
+              {isRandomVoiceover ? 'Plays one by one in random order' : 'Plays one by one in sequential order'}
             </p>
 
             {/* Random Delay Input */}
@@ -317,6 +386,8 @@ export default function Home() {
               type="voiceover"
               onDelete={handleDeleteFile}
               currentPlayingIndex={isPlaying ? currentVoiceoverIndex : undefined}
+              playCounts={playCounts}
+              progress={isPlaying ? progress.voiceover : undefined}
             />
             <div className="mt-4">
               <UploadButton type="voiceover" onUploadComplete={fetchFiles} />

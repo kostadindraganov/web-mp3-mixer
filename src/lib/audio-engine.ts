@@ -9,6 +9,8 @@ export class AudioMixerEngine {
   private masterGain: GainNode | null = null;
   private backgroundBuffer: AudioBuffer | null = null;
   private voiceoverBuffer: AudioBuffer | null = null;
+  private backgroundStartTime: number = 0;
+  private voiceoverStartTime: number = 0;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -51,22 +53,32 @@ export class AudioMixerEngine {
     }
   }
 
-  async playBackground(url: string, loop: boolean = true) {
+  async playBackground(url: string, loop: boolean = true, onEnded?: () => void) {
     if (!this.audioContext || !this.backgroundGain) return;
 
     try {
       // Stop current background if playing
       this.stopBackground();
+      this.backgroundBuffer = null; // Clear buffer to avoid stale duration
 
       this.backgroundBuffer = await this.loadAudio(url);
       this.backgroundSource = this.audioContext.createBufferSource();
       this.backgroundSource.buffer = this.backgroundBuffer;
       this.backgroundSource.loop = loop;
       this.backgroundSource.connect(this.backgroundGain);
+
+      if (onEnded) {
+        this.backgroundSource.onended = onEnded;
+      }
+
+      this.backgroundStartTime = this.audioContext.currentTime;
       this.backgroundSource.start(0);
     } catch (error) {
       console.error('Error playing background audio:', error);
       // Don't throw - allow the app to continue
+      if (onEnded) {
+        onEnded();
+      }
     }
   }
 
@@ -76,6 +88,7 @@ export class AudioMixerEngine {
     try {
       // Stop current voiceover if playing
       this.stopVoiceover();
+      this.voiceoverBuffer = null; // Clear buffer to avoid stale duration
 
       this.voiceoverBuffer = await this.loadAudio(url);
       this.voiceoverSource = this.audioContext.createBufferSource();
@@ -86,6 +99,7 @@ export class AudioMixerEngine {
         this.voiceoverSource.onended = onEnded;
       }
 
+      this.voiceoverStartTime = this.audioContext.currentTime;
       this.voiceoverSource.start(0);
     } catch (error) {
       console.error('Error playing voiceover audio:', error);
@@ -98,6 +112,7 @@ export class AudioMixerEngine {
 
   stopBackground() {
     if (this.backgroundSource) {
+      this.backgroundSource.onended = null;
       try {
         this.backgroundSource.stop();
       } catch (e) {
@@ -109,6 +124,7 @@ export class AudioMixerEngine {
 
   stopVoiceover() {
     if (this.voiceoverSource) {
+      this.voiceoverSource.onended = null;
       try {
         this.voiceoverSource.stop();
       } catch (e) {
@@ -159,6 +175,32 @@ export class AudioMixerEngine {
   isVoiceoverPlaying(): boolean {
     return !!this.voiceoverSource;
   }
+
+  getBackgroundDuration(): number {
+    return this.backgroundBuffer?.duration || 0;
+  }
+
+  getBackgroundCurrentTime(): number {
+    if (!this.backgroundSource || !this.audioContext || !this.backgroundBuffer) return 0;
+    const elapsed = this.audioContext.currentTime - this.backgroundStartTime;
+
+    if (this.backgroundSource.loop) {
+      return elapsed % this.backgroundBuffer.duration;
+    }
+
+    return Math.min(elapsed, this.backgroundBuffer.duration);
+  }
+
+  getVoiceoverDuration(): number {
+    return this.voiceoverBuffer?.duration || 0;
+  }
+
+  getVoiceoverCurrentTime(): number {
+    if (!this.voiceoverSource || !this.audioContext || !this.voiceoverBuffer) return 0;
+    const elapsed = this.audioContext.currentTime - this.voiceoverStartTime;
+    return Math.min(elapsed, this.voiceoverBuffer.duration);
+  }
+
 
   destroy() {
     this.stopAll();
