@@ -152,6 +152,14 @@ export class AudioMixerEngine {
     return !!(this.backgroundSource || this.voiceoverSource);
   }
 
+  isBackgroundPlaying(): boolean {
+    return !!this.backgroundSource;
+  }
+
+  isVoiceoverPlaying(): boolean {
+    return !!this.voiceoverSource;
+  }
+
   destroy() {
     this.stopAll();
     if (this.audioContext) {

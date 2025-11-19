@@ -105,7 +105,7 @@ export default function Home() {
 
     // Set up listener for when background track ends
     backgroundIntervalRef.current = setInterval(() => {
-      if (audioEngineRef.current && !audioEngineRef.current.isPlaying()) {
+      if (audioEngineRef.current && !audioEngineRef.current.isBackgroundPlaying()) {
         if (backgroundIntervalRef.current) {
           clearInterval(backgroundIntervalRef.current);
           backgroundIntervalRef.current = null;
@@ -159,7 +159,7 @@ export default function Home() {
 
         // Set up auto-play for next background track
         backgroundIntervalRef.current = setInterval(() => {
-          if (audioEngineRef.current && !audioEngineRef.current.isPlaying()) {
+          if (audioEngineRef.current && !audioEngineRef.current.isBackgroundPlaying()) {
             if (backgroundIntervalRef.current) {
               clearInterval(backgroundIntervalRef.current);
               backgroundIntervalRef.current = null;
