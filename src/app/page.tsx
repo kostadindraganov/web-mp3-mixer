@@ -17,7 +17,8 @@ export default function Home() {
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
   const [currentVoiceoverIndex, setCurrentVoiceoverIndex] = useState(0);
   const [voiceoverPlayOrder, setVoiceoverPlayOrder] = useState<number[]>([]);
-  const [voiceoverDelay, setVoiceoverDelay] = useState(60); // Delay in seconds before starting voiceover
+  const [voiceoverDelayInput, setVoiceoverDelayInput] = useState(60); // Input value for delay
+  const [voiceoverDelay, setVoiceoverDelay] = useState(60); // Active delay in seconds before starting voiceover
 
   const audioEngineRef = useRef<AudioMixerEngine | null>(null);
   const backgroundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -204,6 +205,10 @@ export default function Home() {
     setVoiceoverFiles((prev) => prev.filter((f) => f.key !== key));
   };
 
+  const handleSetRandomDelay = () => {
+    setVoiceoverDelay(voiceoverDelayInput);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -264,22 +269,28 @@ export default function Home() {
             {/* Random Delay Input */}
             <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
               <label className="block text-sm font-medium text-purple-900 mb-2">
-                Start Delay (seconds)
+                Random Delay (seconds)
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min="0"
                   max="300"
-                  value={voiceoverDelay}
-                  onChange={(e) => setVoiceoverDelay(Number(e.target.value))}
+                  value={voiceoverDelayInput}
+                  onChange={(e) => setVoiceoverDelayInput(Number(e.target.value))}
                   className="flex-1 px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   disabled={isPlaying}
                 />
-                <span className="text-sm text-purple-700 font-medium">{voiceoverDelay}s</span>
+                <button
+                  onClick={handleSetRandomDelay}
+                  disabled={isPlaying}
+                  className="px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Set Random
+                </button>
               </div>
               <p className="text-xs text-purple-600 mt-2">
-                Voiceover will start {voiceoverDelay} seconds after pressing play
+                Active delay: <span className="font-semibold">{voiceoverDelay}s</span> - Voiceover will start {voiceoverDelay} seconds after pressing play
               </p>
             </div>
 
