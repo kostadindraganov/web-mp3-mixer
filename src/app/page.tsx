@@ -15,7 +15,7 @@ export default function Home() {
   const [mixRatio, setMixRatio] = useState(50); // 0-100
   const [masterVolume, setMasterVolume] = useState(80);
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
-  const [currentVoiceoverIndex, setCurrentVoiceoverIndex] = useState(0);
+  const [currentVoiceoverIndex, setCurrentVoiceoverIndex] = useState<number | undefined>(undefined);
   const [voiceoverPlayOrder, setVoiceoverPlayOrder] = useState<number[]>([]);
   const [voiceoverDelayInput, setVoiceoverDelayInput] = useState(60); // Input value for delay
   const [voiceoverDelay, setVoiceoverDelay] = useState(60); // Active delay in seconds before starting voiceover
@@ -143,6 +143,7 @@ export default function Home() {
       clearAllTimers();
       audioEngineRef.current.stopAll();
       setIsPlaying(false);
+      setCurrentVoiceoverIndex(undefined); // Reset voiceover index when stopping
     } else {
       // Start playback
       setIsPlaying(true);
@@ -171,14 +172,18 @@ export default function Home() {
       }
 
       // Start voiceover after delay if available
-      if (voiceoverFiles.length > 0) {
+      if (voiceoverFiles.length > 0 && voiceoverPlayOrder.length > 0) {
         const delayMs = voiceoverDelay * 1000; // Convert seconds to milliseconds
 
         voiceoverDelayTimeoutRef.current = setTimeout(() => {
           if (!audioEngineRef.current || !isPlaying) return;
 
+          // Set the index only when voiceover actually starts playing
+          const firstVoiceoverIndex = voiceoverPlayOrder[0];
+          setCurrentVoiceoverIndex(firstVoiceoverIndex);
+
           audioEngineRef.current.playVoiceover(
-            voiceoverFiles[voiceoverPlayOrder[0]].url,
+            voiceoverFiles[firstVoiceoverIndex].url,
             () => {
               if (isPlaying) {
                 voiceoverTimeoutRef.current = setTimeout(() => playNextVoiceover(), 500);
@@ -267,31 +272,44 @@ export default function Home() {
             </p>
 
             {/* Random Delay Input */}
-            <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <label className="block text-sm font-medium text-purple-900 mb-2">
-                Random Delay (seconds)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="300"
-                  value={voiceoverDelayInput}
-                  onChange={(e) => setVoiceoverDelayInput(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  disabled={isPlaying}
-                />
+            <div className="mb-4 p-5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border-2 border-purple-300 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-base font-bold text-purple-900">
+                  ⏱️ Voiceover Start Delay
+                </label>
+                <div className="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full">
+                  Active: {voiceoverDelay}s
+                </div>
+              </div>
+
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    max="300"
+                    value={voiceoverDelayInput}
+                    onChange={(e) => setVoiceoverDelayInput(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 text-lg font-semibold text-purple-900 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={isPlaying}
+                    placeholder="60"
+                  />
+                </div>
                 <button
                   onClick={handleSetRandomDelay}
                   disabled={isPlaying}
-                  className="px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
                 >
-                  Set Random
+                  Set Delay
                 </button>
               </div>
-              <p className="text-xs text-purple-600 mt-2">
-                Active delay: <span className="font-semibold">{voiceoverDelay}s</span> - Voiceover will start {voiceoverDelay} seconds after pressing play
-              </p>
+
+              <div className="mt-3 p-2 bg-white rounded border border-purple-200">
+                <p className="text-xs text-purple-700 leading-relaxed">
+                  💡 <span className="font-semibold">How it works:</span> After pressing Play, background music starts immediately.
+                  Voiceover will begin after <span className="font-bold text-purple-900">{voiceoverDelay} seconds</span>.
+                </p>
+              </div>
             </div>
 
             <FileList
