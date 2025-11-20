@@ -6,6 +6,8 @@ A modern, web-based audio mixer built with Next.js that allows you to mix backgr
 
 - **Dual Audio Streams**: Mix background music with voice-over audio
 - **Smart Playback**: Background music loops continuously, voice-overs play in random order
+- **Configurable Delay**: Set custom delay (in seconds) before voiceover playback starts
+- **Visual Indicators**: Animated sound bars show which audio file is currently playing
 - **Real-time Mixing**: Adjust the balance between background and voice-over with a slider
 - **Cloud Storage**: Upload and store MP3 files in Cloudflare R2
 - **Volume Control**: Master volume control and individual stream mixing
@@ -59,6 +61,32 @@ yarn install
    - Secret Access Key
    - Account ID (shown in the R2 overview)
 
+#### Configure CORS (Required for Audio Playback)
+
+To allow the browser to fetch audio files, you need to configure CORS on your R2 bucket:
+
+1. In your R2 bucket settings, click on the **Settings** tab
+2. Scroll to **CORS Policy**
+3. Add the following CORS configuration:
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:3000", "https://yourdomain.com"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+**Important Notes:**
+- Replace `https://yourdomain.com` with your actual production domain
+- For development, keep `http://localhost:3000`
+- You can use `["*"]` for AllowedOrigins during development, but use specific domains in production for security
+- The CORS policy is required for the Web Audio API to load and play audio files
+
 ### 4. Configure Environment Variables
 
 1. Copy the example environment file:
@@ -93,13 +121,22 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 1. **Background Music**: Click "Upload MP3" in the left column to add background music files
 2. **Voice Over**: Click "Upload MP3" in the right column to add voice-over files
 
+### Setting Voiceover Delay
+
+1. In the Voice Over column, find the "Random Delay" input field
+2. Enter the desired delay in seconds (0-300)
+3. Click the **Set Random** button to apply the delay
+4. The active delay will be displayed below the input
+
 ### Playing Audio
 
 1. Upload at least one file to either column
-2. Click the **Play button** in the audio player
-3. Both streams will start playing simultaneously:
-   - Background music plays in a continuous loop
-   - Voice-overs play one by one in random order
+2. (Optional) Set the voiceover delay using the steps above
+3. Click the **Play button** in the audio player
+4. Audio streams will start playing:
+   - Background music starts immediately and plays in a continuous loop
+   - Voice-overs start after the configured delay and play one by one in random order
+5. Watch the animated sound bars to see which file is currently playing
 
 ### Mixing Audio
 
@@ -232,11 +269,14 @@ Always remember to set the environment variables on your deployment platform.
 
 ## 🐛 Troubleshooting
 
-### Audio doesn't play
-- Check browser console for errors
-- Ensure files are valid MP3 format
-- Verify R2 credentials are correct
-- Check that presigned URLs are being generated
+### Audio doesn't play / "Failed to fetch" error
+- **CORS Configuration**: This is the most common issue. Make sure you've configured CORS on your R2 bucket (see setup instructions above)
+- **Check Browser Console**: Look for specific error messages in the browser developer console (F12)
+- **Verify URLs**: Check that presigned URLs are being generated correctly
+- **Valid MP3 Format**: Ensure uploaded files are valid MP3 format
+- **R2 Credentials**: Verify R2 credentials in `.env.local` are correct
+- **Network Tab**: Check the browser's Network tab to see if the audio file requests are failing
+- **Try Different Browser**: Some browsers have stricter CORS policies than others
 
 ### Upload fails
 - Verify R2 API token has write permissions

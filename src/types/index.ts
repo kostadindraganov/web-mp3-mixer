@@ -5,6 +5,8 @@ export interface AudioFile {
   size: number;
   lastModified: Date;
   type: 'background' | 'voiceover';
+  playCount?: number;
+  duration?: number;
 }
 
 export interface PlaybackState {
