@@ -114,7 +114,7 @@ export default function Home() {
 
       // Initialize random play order for voiceovers
       if (voiceover.length > 0) {
-        setVoiceoverPlayOrder(shuffleArray(Array.from(Array(voiceover.length).keys())));
+        setVoiceoverPlayOrder(shuffleArray(Array.from({ length: voiceover.length }, (_, i) => i)));
       }
     } catch (error) {
       console.error('Failed to fetch files:', error);
